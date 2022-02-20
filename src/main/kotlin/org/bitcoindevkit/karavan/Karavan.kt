@@ -114,6 +114,14 @@ class WalletController(val walletService: WalletService) {
         return walletService.getTransactions(descriptor, network) + "\n"
     }
 
+    @GetMapping("/transaction")
+    fun createPSBT(@RequestParam(value = "recipient") recipient: String, @RequestParam(value = "amount") amount: Float,
+                   @RequestParam(value = "fee_rate") fee_rate: Byte): String{
+
+        return ""
+    }
+
+
     // Store wallet object into client's cookie session
     fun setCookie(response: HttpServletResponse, walletIn: Wallet) {
 
