@@ -116,7 +116,7 @@ class WalletController(val walletService: WalletService) {
 
     @GetMapping("/transaction")
     fun createPSBT(@RequestParam(value = "recipient") recipient: String, @RequestParam(value = "amount") amount: Float,
-                   @RequestParam(value = "fee_rate") fee_rate: Byte): String{
+                   @RequestParam(value = "fee_rate") fee_rate: Float): String{
 
         return ""
     }
