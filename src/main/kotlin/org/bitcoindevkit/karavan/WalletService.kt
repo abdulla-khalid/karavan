@@ -3,18 +3,14 @@ package org.bitcoindevkit.karavan
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import org.springframework.stereotype.Service
-import org.springframework.web.bind.annotation.CookieValue
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.util.WebUtils
-import javax.servlet.http.Cookie
-import javax.servlet.http.HttpServletRequest
-import javax.servlet.http.HttpServletResponse
 import com.fasterxml.jackson.module.kotlin.*
 import org.bitcoindevkit.*
+import org.bitcoindevkit.Wallet
 
 
 @Service
 class WalletService {
+
 
     // Create null object of type BdkProgress
     // update() function is changed to do nothing
@@ -22,6 +18,15 @@ class WalletService {
         override fun update(progress: Float, message: String?) {}
     }
 
+    // @TODO Hold off on making comparator until we get the Transaction.Confirmed companion object
+    // Comparator needs to be of type Transcation not Transaction.Confirmed
+    private val transactionCompByHeight =  Comparator<Transaction.Confirmed> { a, b ->
+        when {
+            (a.confirmation.height == b.confirmation.height) -> 0
+            (a.confirmation.height > b.confirmation.height) -> 1
+            else -> -1
+        }
+    }
 
     // Connect to Electrum network, sync wallet, and return balance as JSON
     fun getBalance(descriptor: String, networkIn: String): String{
@@ -110,8 +115,13 @@ class WalletService {
         // sync balance of descriptor
         wallet.sync(progressUpdate = NullProgress, maxAddressParam = null)
 
+
+
         // get transactions
         val transactionList = wallet.getTransactions()
+
+        //transactionList.sortedWith(transactionCompByHeight)
+        println(transactionList)
 
         // map transactionList of Transaction objects into JSON using Jackson
         val mapper = jacksonObjectMapper()
