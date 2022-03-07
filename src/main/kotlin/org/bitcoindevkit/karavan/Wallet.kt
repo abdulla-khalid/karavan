@@ -17,20 +17,22 @@ class KaravanWallet(descriptorIn: String, networkIn: String) {
     private val networkURL: String = "ssl://electrum.blockstream.info:60002"
     private lateinit var networkType: Network
 
-    // Create null object of type BdkProgress
-    // update() function is changed to do nothing
+    // Create null object of type BdkProgress, update() function is changed to do nothing
     object NullProgress : BdkProgress {
         override fun update(progress: Float, message: String?) {}
     }
 
-    // @TODO Hold off on making comparator until we get the Transaction.Confirmed companion object
-    // Comparator needs to be of type Transcation not Transaction.Confirmed
-    private val transactionCompByHeight =  Comparator<Transaction.Confirmed> { a, b ->
-        when {
-            (a.confirmation.height == b.confirmation.height) -> 0
-            (a.confirmation.height > b.confirmation.height) -> 1
-            else -> -1
+    // Compare Transaction objects by height (Ascending)
+    private val transactionCompByHeight =  Comparator<Transaction> { a, b ->
+        val aHeight = when(a) {
+            is Transaction.Confirmed -> a.confirmation.height
+            else -> null
         }
+        val bHeight = when(b) {
+            is Transaction.Confirmed -> b.confirmation.height
+            else -> null
+        }
+        compareValues(aHeight,bHeight)
     }
 
     // Return 0 if successful, return -1 if not
@@ -71,7 +73,7 @@ class KaravanWallet(descriptorIn: String, networkIn: String) {
         return 0
     }
 
-    fun getBalance() : String {
+    fun getBalance(): String {
 
         if (!this.isInitialized)
             return "Wallet not Initialized!"
@@ -80,15 +82,14 @@ class KaravanWallet(descriptorIn: String, networkIn: String) {
         this.wallet.sync(progressUpdate = WalletService.NullProgress, maxAddressParam = null)
 
         // get the balance
-        val balance : ULong = wallet.getBalance()
+        val balance: ULong = wallet.getBalance()
 
         // put balance into JSON and return it
         val mapper = ObjectMapper()
         val balanceJSON: ObjectNode = mapper.createObjectNode()
         balanceJSON.put("balance", balance.toString())
-        val balanceJSONString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(balanceJSON)
 
-        return balanceJSONString
+        return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(balanceJSON)
     }
 
     fun getNewAddress() : String {
@@ -108,13 +109,13 @@ class KaravanWallet(descriptorIn: String, networkIn: String) {
 
         // get transactions
         val transactionList = wallet.getTransactions()
-
-        //transactionList.sortedWith(transactionCompByHeight)
-        println(transactionList)
+        // sort transactions by oldest blocks to newest (ascending height)
+        val transactionSorted = transactionList.sortedWith(transactionCompByHeight)
 
         // map transactionList of Transaction objects into JSON using Jackson
         val mapper = jacksonObjectMapper()
-        return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(transactionList)
+
+        return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(transactionSorted)
     }
 
 }
