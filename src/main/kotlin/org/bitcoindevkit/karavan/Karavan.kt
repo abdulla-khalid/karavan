@@ -1,5 +1,6 @@
 package org.bitcoindevkit.karavan
 
+import com.fasterxml.jackson.core.util.RequestPayload
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.web.bind.annotation.*
@@ -19,26 +20,45 @@ fun main(args: Array<String>) {
     runApplication<Karavan>(*args)
 }
 
+
 @RestController
 @RequestMapping("/wallet")
 class WalletController(val walletService: WalletService) {
 
+    private var wallet = KaravanWallet("", "")
+
+    data class WalletPayload(
+        val network : String,
+        val descriptor : String
+    )
+
     // Open Wallet by storing the wallet payload in a browser session cookie
     @PutMapping
-    fun openWallet(response: HttpServletResponse, request: HttpServletRequest, @RequestBody payload: Wallet): String? {
-        // stores payload of type wallet into a cookie on the client's side
-        setCookie(response, payload)
-        return "Wallet is opened!\n"
+    fun openWallet(response: HttpServletResponse, request: HttpServletRequest, @RequestBody payload: WalletPayload): String {
+
+        // Create KaravanWallet object
+        wallet = KaravanWallet(payload.descriptor, payload.network)
+
+        // Initialize wallet and check return status
+        val initStatus = wallet.initializeWallet()
+        return if (initStatus == 0){
+            // stores payload into a cookie on the client's side
+            setCookie(response, payload)
+            "Wallet initialized.\n"
+        } else {
+            "Wallet not successfully initialized.\n"
+        }
+
     }
 
     // Close wallet by dropping existing descriptor cookie
     @DeleteMapping
     fun closeWallet(response: HttpServletResponse, request: HttpServletRequest): String{
 
-        // Retrieve all cookies from request
+        // Null out cookies by first retrieving all cookies from request
         val cookies = request.cookies
 
-        return if (cookies == null) {
+        return if (cookies == null || !wallet.isInitialized()) {
             "Wallet not found!\n"
         }
         else {
@@ -50,6 +70,7 @@ class WalletController(val walletService: WalletService) {
                 cookie.maxAge = 0
                 response.addCookie(cookieReplacement)
             }
+            wallet.closeWallet()
             "Wallet is closed!\n"
         }
     }
@@ -59,21 +80,7 @@ class WalletController(val walletService: WalletService) {
     // return a balance json with the balance amount.
     @GetMapping("/balance")
     fun getBalance(request: HttpServletRequest): String{
-
-        // Retrieve wallet cookies
-        val descCookie = WebUtils.getCookie(request, "descriptor")
-        val networkCookie = WebUtils.getCookie(request, "network")
-
-        // check if cookies are null or dropped
-        if (descCookie == null || networkCookie == null || descCookie.value.isNullOrEmpty() || networkCookie.value.isNullOrEmpty()){
-            return "Wallet not found.\n"
-        }
-
-        val descriptor = descCookie.value
-        val network = networkCookie.value
-
-        // Call getBalance from WalletService class to process logic and return balance JSON
-        return walletService.getBalance(descriptor, network) + "\n"
+        return wallet.getBalance()
     }
 
     @GetMapping("/address/new")
@@ -123,10 +130,11 @@ class WalletController(val walletService: WalletService) {
 
 
     // Store wallet object into client's cookie session
-    fun setCookie(response: HttpServletResponse, walletIn: Wallet) {
+    fun setCookie(response: HttpServletResponse, walletIn: WalletPayload) {
+
 
         // create cookie key-value pairs for every wallet data member
-        for (dataMember in Wallet::class.memberProperties) {
+        for (dataMember in WalletPayload::class.memberProperties) {
             val cookie = Cookie(dataMember.name, dataMember.get(walletIn) as String?)
             // set httpOnly to true so cookie can only be accessed by server (to prevent XSS attacks)
             cookie.isHttpOnly = true
@@ -137,7 +145,7 @@ class WalletController(val walletService: WalletService) {
     }
 
     // Read a single cookie value based on key input
-    fun readCookie(request: HttpServletRequest?, key: String): String? {
+    fun readCookie(request: HttpServletRequest?, key: String): String {
         val cookie = WebUtils.getCookie(request!!, key)
         return if (cookie != null) {
             "Wallet value is ${cookie.value}\n"

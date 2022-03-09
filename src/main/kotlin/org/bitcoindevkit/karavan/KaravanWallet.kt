@@ -82,7 +82,7 @@ class KaravanWallet(descriptorIn: String, networkIn: String) {
         this.wallet.sync(progressUpdate = WalletService.NullProgress, maxAddressParam = null)
 
         // get the balance
-        val balance: ULong = wallet.getBalance()
+        val balance: ULong = this.wallet.getBalance()
 
         // put balance into JSON and return it
         val mapper = ObjectMapper()
@@ -116,6 +116,14 @@ class KaravanWallet(descriptorIn: String, networkIn: String) {
         val mapper = jacksonObjectMapper()
 
         return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(transactionSorted)
+    }
+
+    fun closeWallet() {
+        this.isInitialized = false
+    }
+
+    fun isInitialized() : Boolean {
+        return this.isInitialized
     }
 
 }
